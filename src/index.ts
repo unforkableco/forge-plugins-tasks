@@ -10,15 +10,21 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
 interface Task {
-    id: string;
-    description: string;
-    status: string;
+    label: string;
+    status: 'pending' | 'completed';
     createdAt: string;
     updatedAt: string;
 }
 
-// In-memory store: sessionId -> Task[]
-const taskStore: Record<string, Task[]> = {};
+interface TaskList {
+    id: string;
+    sessionId: string;
+    tasks: Record<string, Task>; // Keyed by label
+    createdAt: string;
+}
+
+// In-memory store: taskListId -> TaskList
+const taskLists: Record<string, TaskList> = {};
 
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
@@ -28,40 +34,84 @@ interface Context {
     sessionId: string;
 }
 
-interface AddTaskRequest {
+// Helper to extract wrapped args if present, or return body directly 
+// (Backwards compatibility not strictly needed since we are breaking change, 
+// but good practice to handle the specific structure expected by Forge).
+// Forge sends: { context: {...}, args: {...} }
+// We can just type the body as { context: ..., args: ... } as before.
+
+interface PluginRequest<T> {
     context: Context;
-    args: {
-        description: string;
-        status?: string;
-    };
+    args: T;
 }
 
-app.post('/add_task', (req, res) => {
+// --- CREATE TASK LIST ---
+app.post('/create_task_list', (req, res) => {
     try {
-        const { context, args } = req.body as AddTaskRequest;
+        const { context } = req.body as PluginRequest<{}>;
 
         if (!context?.sessionId) {
             return res.status(400).json({ error: 'Missing context.sessionId' });
         }
-        if (!args?.description) {
-            return res.status(400).json({ error: 'Missing args.description' });
+
+        const { sessionId } = context;
+        const newListId = uuidv4();
+
+        taskLists[newListId] = {
+            id: newListId,
+            sessionId,
+            tasks: {},
+            createdAt: new Date().toISOString()
+        };
+
+        console.log(`Created task list ${newListId} for session ${sessionId}`);
+        res.json({ id: newListId });
+    } catch (error: any) {
+        console.error('Error in /create_task_list:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- ADD TASK ---
+interface AddTaskArgs {
+    taskListId: string;
+    label: string;
+}
+
+app.post('/add_task', (req, res) => {
+    try {
+        const { context, args } = req.body as PluginRequest<AddTaskArgs>;
+        const { taskListId, label } = args || {};
+
+        if (!context?.sessionId) return res.status(400).json({ error: 'Missing context.sessionId' });
+        if (!taskListId) return res.status(400).json({ error: 'Missing taskListId' });
+        if (!label) return res.status(400).json({ error: 'Missing label' });
+
+        const taskList = taskLists[taskListId];
+        if (!taskList) return res.status(404).json({ error: `Task list not found: ${taskListId}` });
+
+        // Verify session isolation (optional but good practice)
+        if (taskList.sessionId !== context.sessionId) {
+            // Ideally we might treat this as 403 or 404. Let's say 404 to hide it.
+            // return res.status(404).json({ error: `Task list not found` });
+            // For debug simplicity, let's just log a warning but allow it if the ID is known?
+            // No, strictly enforcing session ownership is safer.
+            return res.status(403).json({ error: 'Task list belongs to another session' });
         }
 
-        const sessionId = context.sessionId;
-        const tasks = taskStore[sessionId] || [];
+        if (taskList.tasks[label]) {
+            return res.status(409).json({ error: `Task with label "${label}" already exists` });
+        }
 
         const newTask: Task = {
-            id: uuidv4(),
-            description: args.description,
-            status: args.status || 'pending',
+            label,
+            status: 'pending',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
 
-        tasks.push(newTask);
-        taskStore[sessionId] = tasks;
-
-        console.log(`Added task for session ${sessionId}: ${newTask.id}`);
+        taskList.tasks[label] = newTask;
+        console.log(`Added task "${label}" to list ${taskListId}`);
         res.json(newTask);
     } catch (error: any) {
         console.error('Error in /add_task:', error);
@@ -69,111 +119,124 @@ app.post('/add_task', (req, res) => {
     }
 });
 
-interface UpdateTaskRequest {
-    context: Context;
-    args: {
-        taskId: string;
-        description?: string;
-        status?: string;
-    };
+// --- COMPLETE TASK ---
+interface CompleteTaskArgs {
+    taskListId: string;
+    label: string;
 }
 
-app.post('/update_task', (req, res) => {
+app.post('/complete_task', (req, res) => {
     try {
-        const { context, args } = req.body as UpdateTaskRequest;
+        const { context, args } = req.body as PluginRequest<CompleteTaskArgs>;
+        const { taskListId, label } = args || {};
 
-        if (!context?.sessionId) {
-            return res.status(400).json({ error: 'Missing context.sessionId' });
-        }
-        if (!args?.taskId) {
-            return res.status(400).json({ error: 'Missing args.taskId' });
-        }
+        if (!context?.sessionId) return res.status(400).json({ error: 'Missing context.sessionId' });
+        if (!taskListId) return res.status(400).json({ error: 'Missing taskListId' });
+        if (!label) return res.status(400).json({ error: 'Missing label' });
 
-        const sessionId = context.sessionId;
-        const tasks = taskStore[sessionId];
+        const taskList = taskLists[taskListId];
+        if (!taskList) return res.status(404).json({ error: `Task list not found: ${taskListId}` });
+        if (taskList.sessionId !== context.sessionId) return res.status(403).json({ error: 'Access denied' });
 
-        if (!tasks) {
-            return res.status(404).json({ error: 'No tasks found for this session.' });
-        }
+        const task = taskList.tasks[label];
+        if (!task) return res.status(404).json({ error: `Task not found: "${label}"` });
 
-        const taskIndex = tasks.findIndex(t => t.id === args.taskId);
-        if (taskIndex === -1) {
-            return res.status(404).json({ error: `Task not found: ${args.taskId}` });
-        }
-
-        const task = tasks[taskIndex];
-        if (args.description) task.description = args.description;
-        if (args.status) task.status = args.status;
+        task.status = 'completed';
         task.updatedAt = new Date().toISOString();
 
-        console.log(`Updated task ${task.id} for session ${sessionId}`);
+        console.log(`Completed task "${label}" in list ${taskListId}`);
         res.json(task);
     } catch (error: any) {
-        console.error('Error in /update_task:', error);
+        console.error('Error in /complete_task:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-interface ListTasksRequest {
-    context: Context;
+// --- DELETE TASK ---
+interface DeleteTaskArgs {
+    taskListId: string;
+    label: string;
+}
+
+app.post('/delete_task', (req, res) => {
+    try {
+        const { context, args } = req.body as PluginRequest<DeleteTaskArgs>;
+        const { taskListId, label } = args || {};
+
+        if (!context?.sessionId) return res.status(400).json({ error: 'Missing context.sessionId' });
+        if (!taskListId) return res.status(400).json({ error: 'Missing taskListId' });
+        if (!label) return res.status(400).json({ error: 'Missing label' });
+
+        const taskList = taskLists[taskListId];
+        if (!taskList) return res.status(404).json({ error: `Task list not found: ${taskListId}` });
+        if (taskList.sessionId !== context.sessionId) return res.status(403).json({ error: 'Access denied' });
+
+        if (!taskList.tasks[label]) {
+            return res.status(404).json({ error: `Task not found: "${label}"` });
+        }
+
+        delete taskList.tasks[label];
+        console.log(`Deleted task "${label}" from list ${taskListId}`);
+        res.json({ success: true, deletedLabel: label });
+    } catch (error: any) {
+        console.error('Error in /delete_task:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// --- LIST TASKS ---
+interface ListTasksArgs {
+    taskListId: string;
 }
 
 app.post('/list_tasks', (req, res) => {
     try {
-        const { context } = req.body as ListTasksRequest;
+        const { context, args } = req.body as PluginRequest<ListTasksArgs>;
+        const { taskListId } = args || {};
 
-        if (!context?.sessionId) {
-            return res.status(400).json({ error: 'Missing context.sessionId' });
-        }
+        if (!context?.sessionId) return res.status(400).json({ error: 'Missing context.sessionId' });
+        if (!taskListId) return res.status(400).json({ error: 'Missing taskListId' });
 
-        const sessionId = context.sessionId;
-        const tasks = taskStore[sessionId] || [];
+        const taskList = taskLists[taskListId];
+        if (!taskList) return res.status(404).json({ error: `Task list not found: ${taskListId}` });
+        if (taskList.sessionId !== context.sessionId) return res.status(403).json({ error: 'Access denied' });
 
-        console.log(`Listed ${tasks.length} tasks for session ${sessionId}`);
-        res.json(tasks);
+        const tasksArray = Object.values(taskList.tasks);
+        console.log(`Listed ${tasksArray.length} tasks for list ${taskListId}`);
+        res.json(tasksArray);
     } catch (error: any) {
         console.error('Error in /list_tasks:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-interface DeleteTaskRequest {
-    context: Context;
-    args: {
-        taskId: string;
-    };
+// --- CHECK ALL TASKS COMPLETE ---
+interface CheckAllArgs {
+    taskListId: string;
 }
 
-app.post('/delete_task', (req, res) => {
+app.post('/check_all_tasks_complete', (req, res) => {
     try {
-        const { context, args } = req.body as DeleteTaskRequest;
+        const { context, args } = req.body as PluginRequest<CheckAllArgs>;
+        const { taskListId } = args || {};
 
-        if (!context?.sessionId) {
-            return res.status(400).json({ error: 'Missing context.sessionId' });
-        }
-        if (!args?.taskId) {
-            return res.status(400).json({ error: 'Missing args.taskId' });
-        }
+        if (!context?.sessionId) return res.status(400).json({ error: 'Missing context.sessionId' });
+        if (!taskListId) return res.status(400).json({ error: 'Missing taskListId' });
 
-        const sessionId = context.sessionId;
-        let tasks = taskStore[sessionId];
+        const taskList = taskLists[taskListId];
+        if (!taskList) return res.status(404).json({ error: `Task list not found: ${taskListId}` });
+        if (taskList.sessionId !== context.sessionId) return res.status(403).json({ error: 'Access denied' });
 
-        if (!tasks) {
-            return res.status(404).json({ error: 'No tasks found for this session.' });
-        }
+        const tasksArray = Object.values(taskList.tasks);
+        // If no tasks, technically "all are complete" or "none to be incomplete".
+        // Let's rely on standard logic: every task must be 'completed'.
+        // If list is empty: true.
+        const allComplete = tasksArray.every(t => t.status === 'completed');
 
-        const initLength = tasks.length;
-        tasks = tasks.filter(t => t.id !== args.taskId);
-        taskStore[sessionId] = tasks;
-
-        if (tasks.length === initLength) {
-            return res.status(404).json({ error: `Task not found: ${args.taskId}` });
-        }
-
-        console.log(`Deleted task ${args.taskId} for session ${sessionId}`);
-        res.json({ success: true, deletedId: args.taskId });
+        console.log(`Checked all tasks complete for list ${taskListId}: ${allComplete}`);
+        res.json(allComplete); // Returns boolean directly? Or helper? JSON primitives are valid body.
     } catch (error: any) {
-        console.error('Error in /delete_task:', error);
+        console.error('Error in /check_all_tasks_complete:', error);
         res.status(500).json({ error: error.message });
     }
 });
