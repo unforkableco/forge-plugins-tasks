@@ -21,10 +21,11 @@ RUN npm install
 # Copy source code
 COPY tsconfig.json ./
 COPY src ./src
-COPY src/ui ./dist/ui
-
 # Build TypeScript
 RUN npm run build
+
+# Copy UI files to dist/ui AFTER build to avoid deletion
+COPY src/ui ./dist/ui
 
 # Environment
 ENV PORT=8080

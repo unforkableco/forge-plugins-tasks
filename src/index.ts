@@ -19,8 +19,8 @@ uiApp.use(cors());
 // Serve static files from 'ui' directory (will be copied to dist/ui)
 uiApp.use(express.static(path.join(__dirname, 'ui')));
 
-// UI API to get tasks
-uiApp.get('/api/tasks', (req, res) => {
+// UI API to get tasks (Regex to match any prefix ending in /api/tasks)
+uiApp.get(/\/api\/tasks$/, (req, res) => {
     const sessionId = req.query.sessionId as string;
     if (!sessionId) {
         return res.status(400).json({ error: 'Missing sessionId' });
