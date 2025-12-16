@@ -50,13 +50,16 @@ capabilities:
           **Example:**
           ```
           // Add a task
-          call_plugin(pluginSlug="tasks", toolName="add_task", args={ label: "Design the enclosure base" })
+          call_plugin(pluginSlug="forge-plugins-tasks", toolName="add_task", args={ label: "Design the enclosure base" })
           
           // Complete a task
-          call_plugin(pluginSlug="tasks", toolName="complete_task", args={ label: "Design the enclosure base" })
+          call_plugin(pluginSlug="forge-plugins-tasks", toolName="complete_task", args={ label: "Design the enclosure base" })
           
           // Check if done
-          const allDone = call_plugin(pluginSlug="tasks", toolName="check_all_tasks_complete", args={})
+          const status = call_plugin(pluginSlug="forge-plugins-tasks", toolName="check_all_tasks_complete", args={})
+          if (!status.allComplete) {
+             console.log("Remaining:", status.remaining)
+          }
           ```
 
   tools:
@@ -112,7 +115,7 @@ capabilities:
           endpoint: /delete_task
     
     - name: check_all_tasks_complete
-      description: Check if all tasks in the list are completed.
+      description: Check if all tasks are completed. Returns object with status and remaining tasks.
       parameters:
         type: object
         properties: {}

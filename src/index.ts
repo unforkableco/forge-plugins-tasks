@@ -191,16 +191,17 @@ app.post('/check_all_tasks_complete', (req, res) => {
         const taskList = taskLists[context.sessionId];
         if (!taskList) {
             // No list means no tasks pending. Technically "all complete" is true (vacuously true).
-            return res.json(true);
+            return res.json({ allComplete: true, remaining: [] });
         }
 
         const tasksArray = Object.values(taskList.tasks);
-        if (tasksArray.length === 0) return res.json(true);
+        if (tasksArray.length === 0) return res.json({ allComplete: true, remaining: [] });
 
-        const allComplete = tasksArray.every(t => t.status === 'completed');
+        const remaining = tasksArray.filter(t => t.status !== 'completed').map(t => t.label);
+        const allComplete = remaining.length === 0;
 
-        console.log(`Checked all tasks complete for session ${context.sessionId}: ${allComplete}`);
-        res.json(allComplete);
+        console.log(`Checked tasks for session ${context.sessionId}: ${allComplete}, remaining: ${remaining.length}`);
+        res.json({ allComplete, remaining });
     } catch (error: any) {
         console.error('Error in /check_all_tasks_complete:', error);
         res.status(500).json({ error: error.message });

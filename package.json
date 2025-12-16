@@ -1,6 +1,6 @@
 {
     "name": "@unforkable/forge-plugins-tasks",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "Tasks Plugin for Fabrikator",
     "main": "dist/index.js",
     "scripts": {
