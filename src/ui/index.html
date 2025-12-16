@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,15 +13,18 @@
             margin: 0;
             padding: 20px;
         }
+
         h2 {
             font-size: 1.2rem;
             margin-bottom: 1rem;
             color: #e0e0e0;
         }
+
         ul {
             list-style-type: none;
             padding: 0;
         }
+
         li {
             background-color: #2d2d2d;
             margin-bottom: 8px;
@@ -31,11 +35,13 @@
             justify-content: space-between;
             border: 1px solid #3d3d3d;
         }
+
         li.completed {
             opacity: 0.6;
             text-decoration: line-through;
             border-color: #2d2d2d;
         }
+
         .status {
             font-size: 0.8rem;
             padding: 2px 6px;
@@ -43,16 +49,19 @@
             background-color: #444;
             color: #aaa;
         }
+
         li.completed .status {
             background-color: #2e7d32;
             color: #fff;
         }
+
         .empty {
             color: #888;
             font-style: italic;
         }
     </style>
 </head>
+
 <body>
     <div id="app">
         <h2>Session Tasks</h2>
@@ -71,9 +80,9 @@
             }
 
             try {
-                const response = await fetch(`/api/tasks?sessionId=${encodeURIComponent(sessionId)}`);
+                const response = await fetch(`api/tasks?sessionId=${encodeURIComponent(sessionId)}`);
                 if (!response.ok) throw new Error('Failed to fetch tasks');
-                
+
                 const tasks = await response.json();
                 renderTasks(tasks);
             } catch (error) {
@@ -123,4 +132,5 @@
         setInterval(fetchTasks, 2000);
     </script>
 </body>
+
 </html>
