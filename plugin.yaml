@@ -35,10 +35,14 @@ capabilities:
         priority: 60
         content: |
           ## TASK MANAGEMENT
+
+          **CRITICAL:**
+          Start every design session with a detailed task list that will mirror the roadmap you have in mind. This will make sure you're not forgetting anything.
           
           You can manage your own task list using the `add_task`, `update_task`, `list_tasks`, and `delete_task` tools.
           
           **When to use this:**
+          - ALWAYS
           - At the start of a complex request, break it down into tasks and add them.
           - As you complete steps, update their status to "completed".
           - If you need to change your plan, add or delete tasks.
