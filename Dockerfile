@@ -21,6 +21,7 @@ RUN npm install
 # Copy source code
 COPY tsconfig.json ./
 COPY src ./src
+COPY src/ui ./dist/ui
 
 # Build TypeScript
 RUN npm run build
@@ -30,6 +31,7 @@ ENV PORT=8080
 
 # Expose port
 EXPOSE 8080
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

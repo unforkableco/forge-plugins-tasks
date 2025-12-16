@@ -10,6 +10,36 @@ const port = process.env.PORT || 8080;
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
+// --- UI Server ---
+const uiApp = express();
+const uiPort = 3000;
+import path from 'path';
+
+uiApp.use(cors());
+// Serve static files from 'ui' directory (will be copied to dist/ui)
+uiApp.use(express.static(path.join(__dirname, 'ui')));
+
+// UI API to get tasks
+uiApp.get('/api/tasks', (req, res) => {
+    const sessionId = req.query.sessionId as string;
+    if (!sessionId) {
+        return res.status(400).json({ error: 'Missing sessionId' });
+    }
+    const taskList = taskLists[sessionId];
+    const tasks = taskList ? Object.values(taskList.tasks) : [];
+    res.json(tasks);
+});
+
+// Fallback for SPA (though we only have index.html)
+uiApp.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'ui', 'index.html'));
+});
+
+uiApp.listen(uiPort, () => {
+    console.log(`Tasks Plugin UI listening on port ${uiPort}`);
+});
+// -----------------
+
 interface Task {
     label: string;
     status: 'pending' | 'completed';

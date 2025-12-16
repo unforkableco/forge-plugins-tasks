@@ -22,6 +22,15 @@ capabilities:
   dataAccess:
     sessionState: true
 
+  ui:
+    type: "proxy"
+    port: 3000
+    entrypoint: "/"
+    slots:
+      - name: "agent-session-view"
+        label: "Tasks"
+        icon: "assignment"
+
   executionDefaults:
     type: docker
     config:
