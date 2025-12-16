@@ -1,0 +1,117 @@
+# Tasks Plugin for Fabrikator
+# In-memory task management for agent sessions
+
+plugin:
+  name: Task Manager
+  slug: tasks
+  author: Fabrikator Team
+  description: |
+    Manage a list of tasks for the current session.
+    Allows agents to create, update, and track their progress on tasks.
+  tags:
+    - tasks
+    - planning
+    - memory
+    - state
+  iconUrl: https://fabrikator.ai/icons/tasks.png
+
+requirements:
+  environment: []
+
+capabilities:
+  dataAccess:
+    sessionState: true
+
+  executionDefaults:
+    type: docker
+    config:
+      image: ghcr.io/unforkableco/forge-plugins-tasks:latest
+      port: 8080
+
+  prompts:
+    agents:
+      - agent: cad
+        position: append
+        priority: 60
+        content: |
+          ## TASK MANAGEMENT
+          
+          You can manage your own task list using the `add_task`, `update_task`, `list_tasks`, and `delete_task` tools.
+          
+          **When to use this:**
+          - At the start of a complex request, break it down into tasks and add them.
+          - As you complete steps, update their status to "completed".
+          - If you need to change your plan, add or delete tasks.
+          
+          **Example:**
+          ```
+          // Add a task
+          call_plugin(pluginSlug="tasks", toolName="add_task", args={ description: "Design the enclosure base", status: "pending" })
+          
+          // data returned: { id: "task-123", ... }
+          
+          // Update status
+          call_plugin(pluginSlug="tasks", toolName="update_task", args={ taskId: "task-123", status: "completed" })
+          ```
+
+  tools:
+    - name: add_task
+      description: Add a new task to the session's task list.
+      parameters:
+        type: object
+        properties:
+          description:
+            type: string
+            description: Description of the task.
+          status:
+            type: string
+            description: Initial status (e.g., pending, in-progress, completed).
+            default: pending
+        required: [description]
+      execution:
+        config:
+          endpoint: /add_task
+    
+    - name: update_task
+      description: Update an existing task.
+      parameters:
+        type: object
+        properties:
+          taskId:
+            type: string
+            description: ID of the task to update.
+          description:
+            type: string
+            description: New description (optional).
+          status:
+            type: string
+            description: New status (optional).
+        required: [taskId]
+      execution:
+        config:
+          endpoint: /update_task
+
+    - name: list_tasks
+      description: List all tasks for the current session.
+      parameters:
+        type: object
+        properties: {}
+      execution:
+        config:
+          endpoint: /list_tasks
+
+    - name: delete_task
+      description: Delete a task from the list.
+      parameters:
+        type: object
+        properties:
+          taskId:
+            type: string
+            description: ID of the task to delete.
+        required: [taskId]
+      execution:
+        config:
+          endpoint: /delete_task
+
+pricing:
+  model: free
