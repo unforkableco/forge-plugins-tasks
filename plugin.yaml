@@ -39,7 +39,7 @@ capabilities:
           **CRITICAL:**
           Start every design session with a detailed task list that will mirror the roadmap you have in mind. This will make sure you're not forgetting anything.
           
-          You can manage your own task list using the `create_task_list`, `add_task`, `complete_task`, `list_tasks`, and `delete_task` tools.
+          You can manage your own task list using the `add_task`, `complete_task`, `list_tasks`, and `delete_task` tools.
           
           **When to use this:**
           - ALWAYS
@@ -49,42 +49,28 @@ capabilities:
           
           **Example:**
           ```
-          // Create a list
-          const list = call_plugin(pluginSlug="tasks", toolName="create_task_list", args={})
-          const listId = list.id;
-          
           // Add a task
-          call_plugin(pluginSlug="tasks", toolName="add_task", args={ taskListId: listId, label: "Design the enclosure base" })
+          call_plugin(pluginSlug="tasks", toolName="add_task", args={ label: "Design the enclosure base" })
           
           // Complete a task
-          call_plugin(pluginSlug="tasks", toolName="complete_task", args={ taskListId: listId, label: "Design the enclosure base" })
+          call_plugin(pluginSlug="tasks", toolName="complete_task", args={ label: "Design the enclosure base" })
           
           // Check if done
-          const allDone = call_plugin(pluginSlug="tasks", toolName="check_all_tasks_complete", args={ taskListId: listId })
+          const allDone = call_plugin(pluginSlug="tasks", toolName="check_all_tasks_complete", args={})
           ```
 
   tools:
-    - name: create_task_list
-      description: Create a new unique task list for the current session.
-      parameters:
-        type: object
-        properties: {}
-      execution:
-        config:
-          endpoint: /create_task_list
+
 
     - name: add_task
       description: Add a new task to a specific task list.
       parameters:
         type: object
         properties:
-          taskListId:
-            type: string
-            description: The ID of the task list.
           label:
             type: string
             description: The label (identifier) of the task.
-        required: [taskListId, label]
+        required: [label]
       execution:
         config:
           endpoint: /add_task
@@ -94,13 +80,10 @@ capabilities:
       parameters:
         type: object
         properties:
-          taskListId:
-            type: string
-            description: The ID of the task list.
           label:
             type: string
             description: The label of the task to complete.
-        required: [taskListId, label]
+        required: [label]
       execution:
         config:
           endpoint: /complete_task
@@ -109,11 +92,8 @@ capabilities:
       description: List all tasks in a task list.
       parameters:
         type: object
-        properties:
-          taskListId:
-            type: string
-            description: The ID of the task list.
-        required: [taskListId]
+        properties: {}
+        required: []
       execution:
         config:
           endpoint: /list_tasks
@@ -123,13 +103,10 @@ capabilities:
       parameters:
         type: object
         properties:
-          taskListId:
-            type: string
-            description: The ID of the task list.
           label:
             type: string
             description: The label of the task to delete.
-        required: [taskListId, label]
+        required: [label]
       execution:
         config:
           endpoint: /delete_task
@@ -138,11 +115,8 @@ capabilities:
       description: Check if all tasks in the list are completed.
       parameters:
         type: object
-        properties:
-          taskListId:
-            type: string
-            description: The ID of the task list.
-        required: [taskListId]
+        properties: {}
+        required: []
       execution:
         config:
           endpoint: /check_all_tasks_complete
