@@ -47,6 +47,9 @@ capabilities:
 
           **CRITICAL:**
           Start every design session with a detailed task list that will mirror the roadmap you have in mind. This will make sure you're not forgetting anything.
+          Start with planning your tasks and declaring them using the plugin.
+          As you progress through the tasks, update their status to "completed".
+          Always check that the tasks you declared are completed before moving on to the next task.
           
           You can manage your own task list using the `add_task`, `complete_task`, `list_tasks`, and `delete_task` tools.
           
@@ -82,7 +85,11 @@ capabilities:
           label:
             type: string
             description: The label (identifier) of the task.
-        required: [label]
+          labels:
+            type: array
+            items: {type: string}
+            description: List of task labels to add at once.
+        required: []
       execution:
         config:
           endpoint: /add_task

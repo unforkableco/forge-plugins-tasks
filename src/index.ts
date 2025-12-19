@@ -85,36 +85,59 @@ function getOrCreateTaskList(sessionId: string): TaskList {
 }
 
 // --- ADD TASK ---
+// --- ADD TASK ---
 interface AddTaskArgs {
-    label: string;
+    label?: string;
+    labels?: string[];
 }
 
 app.post('/add_task', (req, res) => {
     try {
         const { context, args } = req.body as PluginRequest<AddTaskArgs>;
-        const { label } = args || {};
+        const { label, labels } = args || {};
 
         if (!context?.sessionId) return res.status(400).json({ error: 'Missing context.sessionId' });
-        if (!label) return res.status(400).json({ error: 'Missing label' });
 
-        const taskList = getOrCreateTaskList(context.sessionId);
-
-        if (taskList.tasks[label]) {
-            return res.status(409).json({ error: `Task with label "${label}" already exists` });
+        const inputs: string[] = [];
+        if (labels && Array.isArray(labels)) {
+            inputs.push(...labels);
+        }
+        if (label) {
+            inputs.push(label);
         }
 
-        const newTask: Task = {
-            label,
-            status: 'pending',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+        if (inputs.length === 0) return res.status(400).json({ error: 'Missing label or labels' });
 
-        taskList.tasks[label] = newTask;
+        const taskList = getOrCreateTaskList(context.sessionId);
+        const addedTasks: Task[] = [];
+        const errors: string[] = [];
+
+        for (const l of inputs) {
+            if (taskList.tasks[l]) {
+                errors.push(`Task "${l}" already exists`);
+                continue;
+            }
+
+            const newTask: Task = {
+                label: l,
+                status: 'pending',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            taskList.tasks[l] = newTask;
+            addedTasks.push(newTask);
+            console.log(`Added task "${l}" to session ${context.sessionId}`);
+        }
+
         taskList.updatedAt = new Date().toISOString();
 
-        console.log(`Added task "${label}" to session ${context.sessionId}`);
-        res.json(newTask);
+        // Backward compatibility: if only single label was requested and added, return single object
+        if (label && !labels && addedTasks.length === 1) {
+            return res.json(addedTasks[0]);
+        }
+
+        res.json({ added: addedTasks, errors });
     } catch (error: any) {
         console.error('Error in /add_task:', error);
         res.status(500).json({ error: error.message });
