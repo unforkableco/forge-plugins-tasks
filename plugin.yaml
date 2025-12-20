@@ -14,6 +14,7 @@ plugin:
     - memory
     - state
   iconUrl: https://fabrikator.ai/icons/tasks.png
+  hasGating: true
 
 requirements:
   environment: []

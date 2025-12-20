@@ -261,6 +261,48 @@ app.post('/check_all_tasks_complete', (req, res) => {
     }
 });
 
+// --- GATING: VALIDATE SESSION COMPLETION ---
+interface ValidateRequest {
+    sessionId: string;
+    artifacts?: Array<{ name: string; url: string }>;
+}
+
+app.post('/validate', (req, res) => {
+    try {
+        const body = req.body as ValidateRequest;
+        const { sessionId } = body;
+
+        console.log(`[validate] sessionId=${sessionId}`);
+
+        if (!sessionId) {
+            return res.json({ validated: false, message: 'Missing sessionId' });
+        }
+
+        const taskList = taskLists[sessionId];
+        if (!taskList || Object.keys(taskList.tasks).length === 0) {
+            // No tasks declared means nothing to block on
+            console.log(`[validate] PASSED (no tasks) for session=${sessionId}`);
+            return res.json({ validated: true });
+        }
+
+        const tasksArray = Object.values(taskList.tasks);
+        const incomplete = tasksArray.filter(t => t.status !== 'completed').map(t => t.label);
+
+        if (incomplete.length > 0) {
+            const message = `The following tasks are incomplete: ${incomplete.join(', ')}`;
+            console.log(`[validate] FAILED: ${message}`);
+            return res.json({ validated: false, message });
+        }
+
+        console.log(`[validate] PASSED for session=${sessionId}`);
+        res.json({ validated: true });
+    } catch (error: any) {
+        console.error('Error in /validate:', error);
+        res.status(500).json({ validated: false, message: error.message });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Tasks Plugin listening on port ${port}`);
+    console.log(`Gating: ENABLED`);
 });
